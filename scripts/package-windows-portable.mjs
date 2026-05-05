@@ -52,9 +52,7 @@ const archive = spawnSync(
     "-ExecutionPolicy",
     "Bypass",
     "-Command",
-    "Compress-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-    appFolder,
-    zipPath,
+    `Compress-Archive -LiteralPath ${quotePowerShell(appFolder)} -DestinationPath ${quotePowerShell(zipPath)} -Force`,
   ],
   {
     cwd: projectRoot,
@@ -84,6 +82,10 @@ function findPowerShell() {
     if (result.status === 0) return command;
   }
   fail("Could not find PowerShell to create the portable zip.");
+}
+
+function quotePowerShell(value) {
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
 function fail(message) {
