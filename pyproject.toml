@@ -1,0 +1,16 @@
+[project]
+name = "pella-order-automation"
+version = "0.1.0"
+description = "Offline-first parser and workbook generator for Pella purchase/work order automation."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "openpyxl>=3.1",
+]
+
+[project.scripts]
+pella-orders = "pella_order_automation.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

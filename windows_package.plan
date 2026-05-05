@@ -1,0 +1,189 @@
+# Windows Packaged App Implementation Plan
+
+Goal:
+
+- Create a Windows packaged version of the Tauri app that users can run from an app icon with no Python, Node.js, Rust, npm, browser tab, command prompt, or manual setup.
+- Start with a no-install portable package.
+- Only add an installer if the portable package is not reliable enough for normal users.
+
+Current assumptions:
+
+- The Windows package must support both Windows 10 and Windows 11.
+- The Windows package only needs to support 64-bit Intel/AMD machines.
+- Windows on ARM is out of scope.
+- The preferred delivery is a portable zip that users can unzip and run directly.
+- A minimal installer is a fallback, not the first delivery target.
+- End users will have administrator rights if needed.
+- Users are allowed to run an unsigned downloaded app.
+- The package will be shared by email if the file size allows it; if it is too large for email, it will be shared through a web-based download method.
+- The package should not create a desktop shortcut.
+- The app should keep logs/troubleshooting files in the same folder as the app.
+- Uninstall or manual cleanup should remove app-owned logs/troubleshooting files.
+- Generated workbooks are user files and should never be removed by uninstall or cleanup steps.
+- Generated workbooks only need to be tested with local output folders, not shared/network drives.
+
+Resolved decisions:
+
+- Support Windows 10 and Windows 11.
+- Build for 64-bit Intel/AMD Windows only.
+- Do not plan for Windows on ARM.
+- Code signing is not required for the first package.
+- Users can run an unsigned downloaded app.
+- Users will have administrator rights if needed.
+- Portable zip delivery is acceptable.
+- Do not create a desktop shortcut.
+- Keep app logs/troubleshooting files beside the app.
+- Remove app-owned logs/troubleshooting files during uninstall or manual cleanup.
+- Test generated workbook output to local folders only.
+- Distribution will be email first if the package size is reasonable, otherwise through a web download.
+
+Implementation progress:
+
+- Added `npm run desktop:package:windows` as the main Windows packaging command.
+- Added `npm run desktop:package:windows:portable` to build the Windows sidecar, build the Tauri app without an installer bundle, and create a portable zip.
+- Added `npm run desktop:package:windows:installer` as the installer fallback command.
+- Added `scripts/package-windows-portable.mjs` to assemble `Pella Order Automation Windows Portable.zip` from the Windows release executable and generator sidecar.
+- Added Windows-only generation logging to `pella-order-automation.log` beside the app executable.
+- Added `.github/workflows/windows-package.yml` to build the Windows portable zip on a hosted GitHub Actions Windows runner.
+
+Packaging commands:
+
+- Preferred portable package: `npm run desktop:package:windows`
+- Explicit portable package: `npm run desktop:package:windows:portable`
+- Installer fallback: `npm run desktop:package:windows:installer`
+
+GitHub Actions build path:
+
+- Workflow name: `Build Windows Portable Package`
+- Manual trigger: GitHub repository -> Actions -> Build Windows Portable Package -> Run workflow.
+- The workflow uses a hosted `windows-latest` runner, installs Node.js, Python, Rust, npm dependencies, and Python generator dependencies, then runs `npm run desktop:package:windows`.
+- The output artifact is named `Pella Order Automation Windows Portable`.
+- The artifact contains `Pella Order Automation Windows Portable.zip`.
+
+Open questions to resolve before implementation:
+
+1. Is Microsoft Edge WebView2 already installed on target machines?
+   - Current answer: unknown.
+   - Plan response: explicitly test on a clean Windows 10 and Windows 11 machine, and decide whether a WebView2 bootstrapper or installer path is needed if the portable app does not launch.
+
+Step-by-step plan:
+
+1. Confirm the target Windows environment.
+   - Build for Windows 10 and Windows 11.
+   - Build for 64-bit Intel/AMD Windows only.
+   - Do not support Windows on ARM for this package.
+   - Treat unsigned-app execution as acceptable for the first release.
+   - Keep code signing as a future option only if SmartScreen or company policy becomes a blocker.
+
+2. Prepare a Windows build machine.
+   - Prefer the hosted GitHub Actions Windows runner in `.github/workflows/windows-package.yml`.
+   - Use a real Windows machine or Windows VM only if GitHub Actions is unavailable.
+   - Install Node.js/npm.
+   - Install Rust/Cargo with the MSVC toolchain.
+   - Install Python 3.11+.
+   - Install Python dependencies, including `openpyxl` and `PyInstaller`.
+   - Confirm `npm`, `cargo`, `rustc`, and `python` are available from PowerShell.
+
+3. Check out or copy the project onto the Windows build machine.
+   - Use the same project files that successfully produced the macOS DMG.
+   - Do not require end users to receive these project files.
+   - Keep build-only tooling on the build machine, not inside the final user package unless Tauri bundles it intentionally.
+
+4. Verify the app still works in Windows development mode.
+   - Run the frontend build with `npm run build`.
+   - Run the Tauri development app with `npm run desktop:dev`.
+   - Confirm the app opens normally.
+   - Confirm native file pickers work.
+   - Confirm paths with spaces work.
+
+5. Run Windows smoke tests for the generator.
+   - Generate output from Example 1.
+   - Generate output from Example 2.
+   - Confirm output workbooks are created.
+   - Confirm warnings/errors appear as expected.
+   - Fix any Windows-specific path or file-locking issues before packaging.
+
+6. Build the Windows generator sidecar.
+   - Run `npm run sidecar:build` on Windows.
+   - Confirm a Windows executable is created under `src-tauri/binaries/`.
+   - Expected filename pattern: `pella-generator-x86_64-pc-windows-msvc.exe`.
+   - Confirm the sidecar runs without a local Python install dependency.
+
+7. Build the Windows Tauri package.
+   - Preferred path: run the `Build Windows Portable Package` GitHub Actions workflow.
+   - Local/VM path: run `npm run desktop:package:windows:portable` on Windows.
+   - Inspect the generated executable under `src-tauri/target/release/`.
+   - Confirm the portable package includes both `Pella Order Automation.exe` and `pella-generator.exe`.
+   - The portable script should also create `dist/Pella Order Automation Windows Portable.zip`.
+
+8. Create the first portable package.
+   - Use `scripts/package-windows-portable.mjs` to create a clean app folder under `dist/windows-portable/Pella Order Automation`.
+   - Zip that folder as `dist/Pella Order Automation Windows Portable.zip`.
+   - The intended user flow is:
+     1. Unzip the folder.
+     2. Open `Pella Order Automation.exe`.
+     3. Generate the workbook.
+   - No installer should be required for this first attempt.
+   - Do not include or create a desktop shortcut.
+   - Keep logs/troubleshooting files inside the unzipped app folder as `pella-order-automation.log`.
+
+9. Test the portable package on a clean Windows machine.
+   - Use a machine or VM that does not have Python, Node.js, Rust, npm, or the project repo installed.
+   - Unzip the portable package.
+   - Launch the app by double-clicking the `.exe`.
+   - Generate Example 1 output.
+   - Generate Example 2 output.
+   - Save generated outputs to local folders only.
+   - Confirm no command prompt or manual dependency installation is required.
+   - Test on both Windows 10 and Windows 11.
+   - Record whether Microsoft Edge WebView2 is present and whether the app launches without extra WebView2 setup.
+
+10. Record any portable-app friction.
+    - Note any SmartScreen warning.
+    - Note any antivirus/Windows Defender warning.
+    - Note any missing WebView/runtime issue.
+    - Note whether users need to right-click/open, unblock the zip, or approve anything unexpected.
+    - If friction is minor, keep the portable package as the preferred delivery.
+
+11. Add an installer only if needed.
+    - Run `npm run desktop:package:windows:installer`.
+    - Use the standard Tauri Windows NSIS installer output.
+    - Users have administrator rights, but prefer the cleanest install path that allows app-folder logs without requiring the app itself to run elevated.
+    - Install only the app files, bundled sidecar, app icon, optional Start Menu entry, and uninstaller.
+    - Do not create a desktop shortcut.
+    - Avoid background services, startup tasks, shell extensions, global PATH changes, registry-heavy configuration, and external dependency installers.
+    - If WebView2 is missing on target machines, decide whether to use an installer path that handles WebView2 cleanly.
+
+12. Test installer behavior if the installer path is used.
+    - Install on a clean Windows machine.
+    - Confirm the app appears in Windows Settings under installed apps.
+    - Launch from the installed app location or Start Menu if a Start Menu entry is created.
+    - Generate Example 1 and Example 2 outputs.
+    - Save generated outputs to local folders only.
+    - Confirm logs/troubleshooting files are written in the app folder.
+    - Uninstall from Windows Settings.
+    - Confirm the app install directory, bundled sidecar, app-owned logs/troubleshooting files, shortcuts if any, and installer registration are removed.
+    - Confirm user-created output workbooks are not deleted.
+
+13. Decide whether code signing is needed.
+    - Code signing is not required for the first package because users can run an unsigned app.
+    - If SmartScreen or company security policy later blocks normal use, investigate code signing.
+    - Record the signing decision before handing the package to non-technical users.
+
+14. Document the final Windows user flow.
+    - For portable delivery, document only unzip, open app, select files, generate workbook.
+    - For installer delivery, document only run installer, open app, select files, generate workbook, uninstall from Windows Settings.
+    - Do not include developer setup steps in end-user instructions.
+    - For manual portable cleanup, document that deleting the unzipped app folder removes the app and its logs/troubleshooting files.
+
+15. Final acceptance check.
+    - A non-technical user can open the app from an icon.
+    - The app works without Python, Node.js, npm, Rust, or repo files.
+    - The packaged app uses the bundled generator sidecar.
+    - The app can select PO/work-order files and save the completed workbook to a user-selected location.
+    - Portable delivery leaves no installed system components behind.
+    - Portable cleanup removes app-owned logs/troubleshooting files by deleting the app folder.
+    - Installer delivery, if used, uninstalls cleanly.
+    - User-created workbook outputs are preserved.
+    - Example 1 and Example 2 work from the packaged Windows app.
+    - The package is verified on both Windows 10 and Windows 11.

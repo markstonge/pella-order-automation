@@ -1,0 +1,13 @@
+[package]
+name = "pella-order-automation"
+version = "0.1.0"
+description = "Offline desktop app for generating completed Pella order workbooks."
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"

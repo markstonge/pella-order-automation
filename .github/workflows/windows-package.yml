@@ -1,0 +1,77 @@
+name: Build Windows Portable Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/windows-package.yml"
+      - "frontend/**"
+      - "scripts/**"
+      - "src/**"
+      - "src-tauri/**"
+      - "index.html"
+      - "package-lock.json"
+      - "package.json"
+      - "pyproject.toml"
+      - "vite.config.js"
+
+jobs:
+  windows-portable:
+    name: Windows portable zip
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Install Python generator dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pyinstaller
+
+      - name: Compile Python sources
+        run: python -m compileall -q src tests
+
+      - name: Run generator smoke checks
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force outputs | Out-Null
+          python -m pella_order_automation.cli generate `
+            --po "reference-files/Purchase Order Example 1.csv" `
+            --work-order "reference-files/Work Order Example 1.xlsx" `
+            --output "outputs/ci-smoke-example-1.xlsx" `
+            --summary-json
+          python -m pella_order_automation.cli generate `
+            --po "reference-files/Purchase Order Example 2.csv" `
+            --work-order "reference-files/Work Order Example 2.xlsx" `
+            --output "outputs/ci-smoke-example-2.xlsx" `
+            --summary-json
+
+      - name: Build Windows portable package
+        run: npm run desktop:package:windows
+
+      - name: Upload Windows portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pella Order Automation Windows Portable
+          path: dist/Pella Order Automation Windows Portable.zip
+          if-no-files-found: error
