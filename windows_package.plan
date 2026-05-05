@@ -45,6 +45,7 @@ Implementation progress:
 - Added `scripts/package-windows-portable.mjs` to assemble `Pella Order Automation Windows Portable.zip` from the Windows release executable and generator sidecar.
 - Added Windows-only generation logging to `pella-order-automation.log` beside the app executable.
 - Added `.github/workflows/windows-package.yml` to build the Windows portable zip on a hosted GitHub Actions Windows runner.
+- Added `src-tauri/icons/icon.ico`, required by Tauri for Windows executable resources.
 
 Packaging commands:
 
